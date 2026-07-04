@@ -5,13 +5,21 @@
 class sphere : public hittable {
 public:
     sphere() {}
-    sphere(const point3& c, float r, shared_ptr<material> mat) : center(c), radius(std::fmax(0,r)), mat(mat) {}
+    // Stationary Sphere
+    sphere(const point3& static_center, double radius, shared_ptr<material> mat)
+      : center(static_center, Vec3(0,0,0)), radius(std::fmax(0,radius)), mat(mat) {}
+
+    // Moving Sphere
+    sphere(const point3& center1, const point3& center2, double radius,
+           shared_ptr<material> mat)
+      : center(center1, center2 - center1), radius(std::fmax(0,radius)), mat(mat) {}
 
     bool hit(const ray& r, interval ray_t, hit_record& rec) const override {
-        Vec3 oc = center - r.getOrigin();
-        auto a = r.getDirection().length() * r.getDirection().length();
+        point3 current_center = center.at(r.time());
+        Vec3 oc = current_center - r.getOrigin();
+        auto a = r.getDirection().length_squared();
         auto h = oc.dot(r.getDirection());
-        auto c = oc.length() * oc.length() - radius * radius;
+        auto c = oc.length_squared() - radius * radius;
         auto discriminant = h * h - a * c;
 
         if (discriminant < 0) {
@@ -27,14 +35,14 @@ public:
         }
         rec.t = t1;
         rec.p = r.at(rec.t);
-        Vec3 outward_normal = (rec.p - center) / radius; // Normalized normal vector
+        Vec3 outward_normal = (rec.p - current_center) / radius; // Normalized normal vector
         rec.set_face_normal(r, outward_normal);
         rec.mat_ptr = mat; // Set material pointer to nullptr or assign a material if needed
         return true; // hit
     }
 private:
-    point3 center; // Center of the sphere
-    float radius;  // Radius of the sphere
+    ray center; // Center of the sphere
+    double radius;  // Radius of the sphere
     shared_ptr<material> mat; // Pointer to the material of the sphere
 };
 

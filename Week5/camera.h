@@ -3,7 +3,11 @@
 
 #include "hittable.h"
 #include "material.h"
+#include <atomic>
 #include <chrono>
+#include <pthread.h>
+#include <unistd.h>
+#include <vector>
 
 class camera {
     public:
@@ -21,19 +25,40 @@ class camera {
         void render(const hittable& world) {
             auto start = std::chrono::high_resolution_clock::now();
             initialise();
-            std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
 
+            std::vector<color3> framebuffer(image_width * image_height);
+            std::atomic<int> next_row(0);
+            std::atomic<int> rows_done(0);
+
+            int thread_count = static_cast<int>(sysconf(_SC_NPROCESSORS_ONLN));
+            if (thread_count < 1) {
+                thread_count = 4;
+            }
+
+            render_task task{this, &world, &framebuffer, &next_row, &rows_done};
+
+            std::vector<pthread_t> threads(thread_count);
+
+            for (int t = 0; t < thread_count; t++) {
+                pthread_create(&threads[t], nullptr, render_worker, &task);
+            }
+
+            while (rows_done.load() < image_height) {
+                std::clog << "\rScanlines remaining: " << (image_height - rows_done.load()) << ' ' << std::flush;
+                usleep(100000);
+            }
+
+            for (int t = 0; t < thread_count; t++) {
+                pthread_join(threads[t], nullptr);
+            }
+
+            std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
             for (int j = 0; j < image_height; j++) {
-                std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
                 for (int i = 0; i < image_width; i++) {
-                    color3 pixel_color(0, 0, 0);
-                    for (int s = 0; s < sample_per_pixel; s++) {
-                        ray r = get_ray(i,j);
-                        pixel_color = pixel_color + ray_color(r, max_depth, world);
-                    }
-                    write_color(std::cout, pixel_color * pixel_size);
+                    write_color(std::cout, framebuffer[j * image_width + i]);
                 }
             }
+
             std::clog << "\rDone.                 \n";
             auto end = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -49,6 +74,42 @@ class camera {
         Vec3 u, v, w;
         Vec3 defocus_disk_u;
         Vec3 defocus_disk_v;
+
+        struct render_task {
+            const camera* cam;
+            const hittable* world;
+            std::vector<color3>* framebuffer;
+            std::atomic<int>* next_row;
+            std::atomic<int>* rows_done;
+        };
+
+        static void* render_worker(void* arg) {
+            auto* task = static_cast<render_task*>(arg);
+
+            while (true) {
+                int j = task->next_row->fetch_add(1);
+                if (j >= task->cam->image_height) {
+                    break;
+                }
+
+                for (int i = 0; i < task->cam->image_width; i++) {
+                    (*task->framebuffer)[j * task->cam->image_width + i] =
+                        task->cam->render_pixel(i, j, *task->world);
+                }
+                task->rows_done->fetch_add(1);
+            }
+
+            return nullptr;
+        }
+
+        color3 render_pixel(int i, int j, const hittable& world) const {
+            color3 pixel_color(0, 0, 0);
+            for (int s = 0; s < sample_per_pixel; s++) {
+                ray r = get_ray(i,j);
+                pixel_color = pixel_color + ray_color(r, max_depth, world);
+            }
+            return pixel_color * pixel_size;
+        }
 
         void initialise() {
             image_height = int(image_width / aspect_ratio);
@@ -84,7 +145,8 @@ class camera {
             auto pixel_sample = pixel00_location + (delta_u*(i+offset.x())) + (delta_v*(j+offset.y()));
             auto ray_origin = (defocus_angle<=0) ? center : defocus_disk_sample();
             auto ray_direction = pixel_sample - ray_origin;
-            return ray(ray_origin, ray_direction);
+            auto time = random_double(0.0, 1.0);
+            return ray(ray_origin, ray_direction, time);
         }
 
         Vec3 sample_square() const {

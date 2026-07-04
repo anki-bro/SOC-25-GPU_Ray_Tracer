@@ -47,6 +47,10 @@ public:
         return std::sqrt((v[0] * v[0]) + (v[1] * v[1]) + (v[2] * v[2]));
     }
 
+    float length_squared() const {
+        return (v[0] * v[0]) + (v[1] * v[1]) + (v[2] * v[2]);
+    }
+
     bool near_zero() const {
         return ((std::fabs(v[0]) < 1e-8) && (std::fabs(v[1]) < 1e-8) &&(std::fabs(v[2]) < 1e-8));
     }
@@ -70,7 +74,7 @@ public:
     static Vec3 random_in_unit_disk() {
         while (true) {
             Vec3 p = Vec3(random_double(-1, 1), random_double(-1, 1), 0);
-            if (p.length() < 1.0) {
+            if (p.length_squared() < 1.0) {
                 return p; 
             }
         }
@@ -79,7 +83,8 @@ public:
     static Vec3 random_unit_vector() {
         while (true) {
             Vec3 p = Vec3::random(-1, 1);
-            if (1e-8 < p.length()*p.length() && p.length()*p.length() <= 1.0) {
+            auto len_squared = p.length_squared();
+            if (1e-8 < len_squared && len_squared <= 1.0) {
                 return p; 
             }
         }

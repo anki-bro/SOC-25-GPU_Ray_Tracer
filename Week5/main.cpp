@@ -24,17 +24,20 @@ int main() {
                     // diffuse
                     auto albedo = color3::random() * color3::random();
                     sphere_material = make_shared<lambertian>(albedo);
-                    world.add(make_shared<sphere>(center, 0.2, sphere_material));
+                    auto center2 = center + Vec3(0, random_double(0,.5), 0);
+                    world.add(make_shared<sphere>(center, center2, 0.2, sphere_material));
                 } else if (choose_mat < 0.95) {
                     // metal
                     auto albedo = color3::random(0.5, 1);
                     auto fuzz = random_double(0, 0.5);
                     sphere_material = make_shared<metal>(albedo, fuzz);
-                    world.add(make_shared<sphere>(center, 0.2, sphere_material));
+                    auto center2 = center + Vec3(0, random_double(0,.5), 0);
+                    world.add(make_shared<sphere>(center, center2, 0.2, sphere_material));
                 } else {
                     // glass
                     sphere_material = make_shared<dielectric>(1.5);
-                    world.add(make_shared<sphere>(center, 0.2, sphere_material));
+                    auto center2 = center + Vec3(0, random_double(0,.5), 0);
+                    world.add(make_shared<sphere>(center, center2, 0.2, sphere_material));
                 }
             }
         }
@@ -53,7 +56,7 @@ int main() {
 
     cam.aspect_ratio      = 16.0 / 9.0;
     cam.image_width       = 1200;
-    cam.sample_per_pixel = 10;
+    cam.sample_per_pixel = 100;
     cam.max_depth         = 20;
 
     cam.vfov     = 20;
@@ -62,7 +65,7 @@ int main() {
     cam.vup      = Vec3(0,1,0);
 
     cam.defocus_angle = 0.6;
-    cam.focus_distance    = 10.0;
+    cam.focus_distance = 10.0;
 
     cam.render(world);
 }
