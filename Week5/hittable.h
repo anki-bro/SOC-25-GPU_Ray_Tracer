@@ -9,6 +9,8 @@ public:
     point3 p;        
     Vec3 normal;    
     float t; 
+    double u; // Texture coordinate u
+    double v; // Texture coordinate v
     shared_ptr<material> mat_ptr; // Pointer to the material of the hit object
     bool front_face;  
     void set_face_normal(const ray& r, const Vec3& outward_normal) {

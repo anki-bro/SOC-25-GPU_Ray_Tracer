@@ -2,11 +2,15 @@
 #define MATERIAL_H
 
 #include "hittable.h"
+#include "texture.h"
 
 class material {
     public:
         virtual ~material() = default; 
 
+        virtual color3 emitted(double u, double v, const point3& p) const {
+            return color3(0, 0, 0); // default implementation returns black (no emission)
+        }
         virtual bool scatter(const ray& r_in, const hit_record& rec, color3& attenuation, ray& scattered) const {
             return false; // default implementation does not scatter
         }
@@ -14,7 +18,9 @@ class material {
 
 class lambertian : public material {
     public:
-        lambertian(const color3& a) : albedo(a) {}
+        lambertian(shared_ptr<texture> a) : albedo_texture(a) {}
+
+        lambertian(const color3& a) : albedo_texture(make_shared<solid_color>(a)) {}
 
         bool scatter(const ray& r_in, const hit_record& rec, color3& attenuation, ray& scattered) const override {
             auto scatter_direction = rec.normal + Vec3::random_unit_vector();
@@ -22,11 +28,11 @@ class lambertian : public material {
                 scatter_direction = rec.normal; // if random direction is near zero, use the normal
             }
             scattered = ray(rec.p, scatter_direction,r_in.time());
-            attenuation = albedo;
+            attenuation = albedo_texture->value(rec.u, rec.v, rec.p); // use texture for attenuation
             return true;
         }
     private:
-        color3 albedo; // Diffuse color of the material
+        shared_ptr<texture> albedo_texture; // texture for the material's color
 };
 
 class metal : public material {
@@ -75,6 +81,18 @@ class dielectric : public material {
             r0 = r0 * r0;
             return r0 + (1 - r0) * std::pow((1 - cosine), 5);
         }
+};
+
+class diffuse_light : public material {
+    public:
+        diffuse_light(shared_ptr<texture> texture) : emit_texture(texture) {}
+        diffuse_light(const color3& emit) : emit_texture(make_shared<solid_color>(emit)) {}
+
+        color3 emitted(double u, double v, const point3& p) const {
+            return emit_texture->value(u, v, p); // Return the emitted color from the texture
+        }
+    private:
+        shared_ptr<texture> emit_texture; // Texture for the emitted light
 };
 
 #endif

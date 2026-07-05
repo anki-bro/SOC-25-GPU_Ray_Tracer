@@ -15,6 +15,7 @@ class camera {
         int image_width = 100;
         int sample_per_pixel = 10;
         int max_depth = 10;
+        color3 background = color3(0, 0, 0);
         float vfov = 90;
         point3 lookfrom = point3(0, 0, 0);
         point3 lookat = point3(0, 0, -1);
@@ -162,17 +163,25 @@ class camera {
             if(depth <= 0) {
                 return color3(0, 0, 0); 
             }
+
             hit_record rec;
 
-            if (world.hit(r, interval(0.001, infinity), rec)) {
-                color3 attenuation;
-                ray scattered;
-                if(rec.mat_ptr->scatter(r, rec, attenuation, scattered)) {
-                    auto scattered_color = ray_color(scattered, depth-1, world);
-                    return scattered_color * attenuation; // Return the color after scattering
-                }
-                return color3(0, 0, 0); // Return black if no scattering occurs
+            if(!world.hit(r, interval(0.001, infinity), rec)) {
+                return background; // Return background color if no hit occurs
             }
+
+            color3 attenuation;
+            ray scattered;
+            color3 emitted_color = rec.mat_ptr->emitted(rec.u, rec.v, rec.p);
+
+                // If the material scatters, return emitted + attenuated scattered color
+                if (rec.mat_ptr->scatter(r, rec, attenuation, scattered)) {
+                    return emitted_color + ray_color(scattered, depth-1, world) * attenuation;
+                }
+
+                // Otherwise (e.g., light sources), return only the emitted color
+                return emitted_color;
+            
             Vec3 unit_direction = r.getDirection().unit();
             auto a = 0.5*(unit_direction.y() + 1.0);
             return color3(1.0, 1.0, 1.0)*(1.0-a) + color3(0.5, 0.7, 1.0)*a;
